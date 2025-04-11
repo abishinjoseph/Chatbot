@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MediCare Chatbot</title>
+    <style>
+        body { text-align: center; font-family: Arial, sans-serif; background: #f1f5f9; padding: 20px; }
+        .container { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); width: 400px; margin: auto; }
+        .chat-box { height: 300px; overflow-y: auto; background: #eef2ff; padding: 10px; border-radius: 10px; text-align: left; }
+        .input-area { display: flex; margin-top: 10px; }
+        input { flex: 1; padding: 10px; border-radius: 10px; border: 1px solid #93c5fd; }
+        button { padding: 10px; margin-left: 5px; background: #3b82f6; color: white; border: none; cursor: pointer; border-radius: 10px; }
+        .nav-buttons { margin-bottom: 20px; }
+        .nav-buttons button { margin: 5px; }
+        h2 { color: #1e40af; }
+    </style>
+</head>
+<body>
+    <h2>💬 MediCare Chatbot</h2>
+    <div class="nav-buttons">
+        <button onclick="findNearestHospital()">Find Nearest Hospital 🏥</button>
+        <button onclick="startVoiceSearch()">🎤 Voice Search</button>
+        <button onclick="window.location.href='/user'">📅 Book Appointment</button>
+        <button onclick="window.location.href='/admin'">👨‍⚕️ Admin Portal</button>
+        <button onclick="window.location.href='/appointments'">📋 View Appointments</button>
+    </div>
+    <div class="container">
+        <div class="chat-box" id="chatOutput"></div>
+        <div class="input-area">
+            <input type="text" id="chatInput" placeholder="Ask MediCare..." onkeypress="if(event.key === 'Enter') askChatbot()" />
+            <button onclick="askChatbot()">Send</button>
+        </div>
+    </div>
+
+    <script>
+        function findNearestHospital() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(position => {
+                    let lat = position.coords.latitude;
+                    let lon = position.coords.longitude;
+                    window.open(`https://www.google.com/maps/search/hospitals/@${lat},${lon},14z`, '_blank');
+                }, () => alert("Location access denied. Please enable GPS."));
+            } else {
+                alert("Geolocation is not supported.");
+            }
+        }
+
+        function startVoiceSearch() {
+            if (!window.SpeechRecognition && !window.webkitSpeechRecognition) {
+                alert("Speech recognition is not supported in your browser.");
+                return;
+            }
+
+            let recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+            recognition.lang = "en-US";
+            recognition.onresult = event => {
+                let voiceInput = event.results[0][0].transcript.toLowerCase();
+                document.getElementById('chatInput').value = voiceInput;
+                document.getElementById('chatOutput').innerHTML += `<p><b>You:</b> ${voiceInput}</p>`;
+                fetchChatbotResponse(voiceInput);
+            };
+            recognition.onerror = () => alert("Voice recognition failed.");
+            recognition.start();
+        }
+
+        async function askChatbot() {
+            let userMessage = document.getElementById('chatInput').value.trim();
+            if (!userMessage) return;
+            document.getElementById('chatOutput').innerHTML += `<p><b>You:</b> ${userMessage}</p>`;
+            document.getElementById('chatInput').value = '';
+            fetchChatbotResponse(userMessage);
+        }
+
+        async function fetchChatbotResponse(message) {
+            let chatOutput = document.getElementById('chatOutput');
+            chatOutput.innerHTML += `<p><i>MediCare is typing...</i></p>`;
+            chatOutput.scrollTop = chatOutput.scrollHeight;
+
+            try {
+                let response = await fetch('/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message })
+                });
+
+                let data = await response.json();
+                chatOutput.innerHTML = chatOutput.innerHTML.replace(`<p><i>MediCare is typing...</i></p>`, "");
+                chatOutput.innerHTML += `<p><b>Bot:</b> ${data.response}</p>`;
+                chatOutput.scrollTop = chatOutput.scrollHeight;
+
+                let speech = new SpeechSynthesisUtterance(data.response);
+                speech.lang = "en-US";
+                window.speechSynthesis.speak(speech);
+            } catch (error) {
+                chatOutput.innerHTML = chatOutput.innerHTML.replace(`<p><i>MediCare is typing...</i></p>`, "");
+                chatOutput.innerHTML += `<p><b>Bot:</b> Sorry, I encountered an error. Please try again.</p>`;
+                chatOutput.scrollTop = chatOutput.scrollHeight;
+            }
+        }
+
+        // Send a welcome message when the page loads
+        window.onload = function() {
+            document.getElementById('chatOutput').innerHTML = `<p><b>Bot:</b> Hello! I'm MediCare, your medical assistant. How can I help you today?</p>`;
+        };
+    </script>
+</body>
+</html>
